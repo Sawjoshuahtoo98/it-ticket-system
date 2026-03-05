@@ -1,0 +1,78 @@
+services:
+  - type: web
+    name: helpdesk-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES
+        value: 7d
+      - key: DB_HOST
+        fromDatabase:
+          name: helpdesk-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: helpdesk-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: helpdesk-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: helpdesk-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: helpdesk-db
+          property: password
+      - key: FRONTEND_URL
+        value: https://helpdesk-ui.onrender.com  # Update after frontend deploys
+      - key: SMTP_HOST
+        value: sandbox.smtp.mailtrap.io          # Change to real SMTP for production
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false   # Set manually in Render dashboard
+      - key: SMTP_PASS
+        sync: false   # Set manually in Render dashboard
+      - key: EMAIL_FROM
+        value: HelpDesk <noreply@helpdesk.com>
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+
+  - type: web
+    name: helpdesk-ui
+    runtime: static
+    rootDir: frontend
+    buildCommand: ""
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: helpdesk-db
+    databaseName: helpdesk
+    user: helpdesk_user
+    plan: free

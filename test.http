@@ -1,0 +1,183 @@
+### ════════════════════════════════════════
+### HELPDESK API — REST CLIENT TESTS
+### Install "REST Client" extension in VS Code
+### Click "Send Request" above each ###
+### ════════════════════════════════════════
+
+### Switch environment here:
+@base = http://localhost:3000/api
+# @base = https://helpdesk-api.onrender.com/api
+
+### Paste tokens + IDs after running requests:
+@token      = PASTE_ACCESS_TOKEN_HERE
+@refresh    = PASTE_REFRESH_TOKEN_HERE
+@ticket_id  = PASTE_TICKET_ID_HERE
+@comment_id = PASTE_COMMENT_ID_HERE
+@tech_id    = PASTE_TECH_USER_ID_HERE
+
+
+### ── HEALTH ─────────────────────────────
+GET {{base}}/health
+
+
+### ── LOGIN (Admin) ──────────────────────
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@company.com",
+  "password": "Admin@123"
+}
+
+
+### ── LOGIN (Technician) ─────────────────
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "tech@company.com",
+  "password": "Tech@123"
+}
+
+
+### ── LOGIN (User) ───────────────────────
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "employee@company.com",
+  "password": "User@123"
+}
+
+
+### ── MY PROFILE ─────────────────────────
+GET {{base}}/auth/me
+Authorization: Bearer {{token}}
+
+
+### ── REFRESH TOKEN ───────────────────────
+POST {{base}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh}}"
+}
+
+
+### ── LOGOUT ──────────────────────────────
+POST {{base}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh}}"
+}
+
+
+### ── CREATE TICKET ──────────────────────
+### (triggers confirmation email)
+POST {{base}}/tickets
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "VPN drops every 30 minutes",
+  "description": "Cannot stay connected to company VPN from home office. Error 691 appears after exactly 30 minutes. Windows 11 laptop, HP EliteBook. Started after last Windows update.",
+  "priority": "high",
+  "category": "network"
+}
+
+
+### ── LIST ALL TICKETS ────────────────────
+GET {{base}}/tickets
+Authorization: Bearer {{token}}
+
+
+### ── FILTER TICKETS ──────────────────────
+GET {{base}}/tickets?status=open&priority=high&page=1&limit=10
+Authorization: Bearer {{token}}
+
+
+### ── SEARCH TICKETS ──────────────────────
+GET {{base}}/tickets?search=VPN
+Authorization: Bearer {{token}}
+
+
+### ── DASHBOARD STATS ─────────────────────
+GET {{base}}/tickets/stats
+Authorization: Bearer {{token}}
+
+
+### ── GET SINGLE TICKET ───────────────────
+GET {{base}}/tickets/{{ticket_id}}
+Authorization: Bearer {{token}}
+
+
+### ── ASSIGN TICKET ────────────────────────
+### (triggers assigned email)
+PATCH {{base}}/tickets/{{ticket_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assignedTo": "{{tech_id}}",
+  "status": "in_progress"
+}
+
+
+### ── RESOLVE TICKET ───────────────────────
+### (triggers resolved email)
+PATCH {{base}}/tickets/{{ticket_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "resolved"
+}
+
+
+### ── ADD COMMENT ─────────────────────────
+### (triggers comment email)
+POST {{base}}/tickets/{{ticket_id}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "I've picked up this ticket. Investigating the VPN logs now. Can you confirm your Windows build version (Settings → System → About)?",
+  "isInternal": false
+}
+
+
+### ── ADD INTERNAL NOTE ────────────────────
+POST {{base}}/tickets/{{ticket_id}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "INTERNAL: This looks related to RADIUS server timeout. Check auth logs on FS-AUTH-01.",
+  "isInternal": true
+}
+
+
+### ── LIST USERS (admin only) ─────────────
+GET {{base}}/users
+Authorization: Bearer {{token}}
+
+
+### ── LIST TECHNICIANS ────────────────────
+GET {{base}}/users/technicians
+Authorization: Bearer {{token}}
+
+
+### ── GET NOTIFICATIONS ───────────────────
+GET {{base}}/notifications
+Authorization: Bearer {{token}}
+
+
+### ── MARK ALL READ ───────────────────────
+PUT {{base}}/notifications/read-all
+Authorization: Bearer {{token}}
+
+
+### ── DELETE TICKET (admin) ──────────────
+DELETE {{base}}/tickets/{{ticket_id}}
+Authorization: Bearer {{token}}

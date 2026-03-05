@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HelpDesk OS — IT Support</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c0f; --surface:#111318; --surface2:#181c23; --surface3:#1e2330;
+  --border:#1f2633; --border2:#2a3347;
+  --text:#c8d4e8; --text-dim:#5a6a85; --text-muted:#3a4a65;
+  --accent:#00d4ff; --accent-dim:rgba(0,212,255,.12); --accent-glow:rgba(0,212,255,.25);
+  --green:#00ff88; --green-dim:rgba(0,255,136,.1);
+  --yellow:#ffd60a; --yellow-dim:rgba(255,214,10,.1);
+  --red:#ff3b3b; --red-dim:rgba(255,59,59,.1);
+  --orange:#ff7b00; --orange-dim:rgba(255,123,0,.1);
+  --purple:#a78bfa;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+  --r:4px; --sidebar:244px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;font-family:inherit;border:none;background:none}
+input,select,textarea{font-family:inherit;font-size:14px}
+a{text-decoration:none;color:inherit}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ─ LOGIN ──────────────────────────────────────────────────── */
+#loginWrap{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:0}
+.login-card{width:380px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;overflow:hidden;box-shadow:0 0 60px rgba(0,212,255,.06)}
+.login-hdr{background:linear-gradient(135deg,#0f1825,#1a2a40);padding:28px 32px;border-bottom:1px solid var(--border)}
+.login-logo{display:flex;align-items:center;gap:12px}
+.login-icon{width:36px;height:36px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:6px;display:grid;place-items:center;font-size:18px}
+.login-brand{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent)}
+.login-sub{font-size:10px;color:var(--text-muted);font-family:var(--mono);letter-spacing:.15em;margin-top:2px}
+.login-body{padding:28px 32px}
+.login-welcome{font-size:20px;font-weight:700;margin-bottom:4px}
+.login-hint{font-size:12px;color:var(--text-dim);margin-bottom:24px}
+.field{margin-bottom:16px}
+.field-label{font-size:10px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-dim);margin-bottom:6px;display:block}
+.field-input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:10px 14px;font-size:13px;outline:none;transition:border-color .15s}
+.field-input:focus{border-color:var(--accent)}
+.field-input::placeholder{color:var(--text-muted)}
+select.field-input option{background:var(--surface2)}
+#loginError{display:none;color:var(--red);font-size:12px;font-family:var(--mono);background:var(--red-dim);border:1px solid rgba(255,59,59,.2);border-radius:var(--r);padding:8px 12px;margin-bottom:14px}
+.btn-login{width:100%;background:var(--accent);color:var(--bg);font-weight:700;font-size:13px;font-family:var(--mono);padding:12px;border-radius:var(--r);letter-spacing:.05em;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-login:hover{background:#33ddff;transform:translateY(-1px)}
+.btn-login:active{transform:none}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.demo-creds{margin-top:20px;padding:12px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border)}
+.demo-creds-title{font-size:9px;font-family:var(--mono);letter-spacing:.2em;color:var(--text-muted);margin-bottom:8px}
+.cred-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;cursor:pointer;border-radius:2px;padding:4px 6px;transition:background .1s}
+.cred-row:hover{background:var(--border)}
+.cred-email{font-size:11px;font-family:var(--mono);color:var(--accent)}
+.cred-role{font-size:9px;padding:1px 6px;border-radius:10px}
+.role-admin{background:var(--accent-dim);color:var(--accent)}
+.role-technician{background:var(--green-dim);color:var(--green)}
+.role-user{background:var(--border);color:var(--text-dim)}
+
+/* ─ APP LAYOUT ─────────────────────────────────────────────── */
+#app{display:none;height:100vh;display:grid;grid-template-columns:var(--sidebar) 1fr}
+#app.visible{display:grid}
+
+/* ─ SIDEBAR ────────────────────────────────────────────────── */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--green),transparent)}
+.sb-logo{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+.sb-logo-row{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent)}
+.sb-icon{width:28px;height:28px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--r);display:grid;place-items:center;font-size:13px}
+.sb-sub{font-size:9px;color:var(--text-muted);letter-spacing:.15em;font-family:var(--mono);margin-top:1px}
+.sb-user{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent-dim),var(--green-dim));border:1px solid var(--accent);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+.sb-uname{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-urole{font-size:9px;font-family:var(--mono);letter-spacing:.1em;padding:1px 6px;border-radius:10px;display:inline-block;margin-top:2px}
+.sb-nav{padding:6px 0;flex:1;overflow-y:auto}
+.sb-section{padding:14px 16px 3px;font-size:9px;font-family:var(--mono);letter-spacing:.2em;color:var(--text-muted)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 14px;margin:1px 8px;border-radius:var(--r);font-size:13px;color:var(--text-dim);cursor:pointer;transition:all .12s;position:relative;user-select:none}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:65%;background:var(--accent);border-radius:0 2px 2px 0}
+.nav-icon{width:16px;text-align:center;font-size:14px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;font-family:var(--mono)}
+.sb-foot{padding:10px 14px;border-top:1px solid var(--border)}
+.status-dot-wrap{display:flex;align-items:center;gap:7px;font-size:10px;font-family:var(--mono);color:var(--text-muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─ MAIN ───────────────────────────────────────────────────── */
+.main{display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 22px;height:50px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.page-title{font-size:15px;font-weight:600}
+.breadcrumb{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.icon-btn{width:32px;height:32px;border-radius:var(--r);border:1px solid var(--border);color:var(--text-dim);display:grid;place-items:center;font-size:14px;transition:all .12s;position:relative}
+.icon-btn:hover{border-color:var(--border2);color:var(--text);background:var(--surface2)}
+.notif-pip{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--red)}
+.btn-primary{display:flex;align-items:center;gap:6px;background:var(--accent);color:var(--bg);font-weight:700;font-size:11px;font-family:var(--mono);padding:7px 14px;border-radius:var(--r);transition:all .12s;letter-spacing:.05em}
+.btn-primary:hover{background:#33ddff;transform:translateY(-1px)}
+.btn-secondary{display:flex;align-items:center;gap:6px;border:1px solid var(--border2);color:var(--text-dim);font-size:11px;font-family:var(--mono);padding:7px 12px;border-radius:var(--r);transition:all .12s}
+.btn-secondary:hover{border-color:var(--text-dim);color:var(--text)}
+.btn-danger{display:flex;align-items:center;gap:6px;background:var(--red-dim);border:1px solid var(--red);color:var(--red);font-size:11px;font-family:var(--mono);padding:7px 12px;border-radius:var(--r);transition:all .12s}
+.btn-danger:hover{background:var(--red);color:#fff}
+
+/* ─ PAGE ───────────────────────────────────────────────────── */
+.page{flex:1;overflow-y:auto;padding:22px}
+.page-hidden{display:none!important}
+
+/* ─ STATS ──────────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;transition:border-color .15s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.stat-card.c-blue::after{background:var(--accent)} .stat-card.c-yellow::after{background:var(--yellow)}
+.stat-card.c-green::after{background:var(--green)}  .stat-card.c-red::after{background:var(--red)}
+.stat-label{font-size:9px;font-family:var(--mono);letter-spacing:.18em;color:var(--text-dim);margin-bottom:8px}
+.stat-val{font-size:30px;font-weight:700;font-family:var(--mono);line-height:1}
+.c-blue .stat-val{color:var(--accent)} .c-yellow .stat-val{color:var(--yellow)}
+.c-green .stat-val{color:var(--green)} .c-red .stat-val{color:var(--red)}
+.stat-sub{font-size:10px;color:var(--text-muted);margin-top:5px;font-family:var(--mono)}
+.stat-icon{position:absolute;top:14px;right:14px;font-size:18px;opacity:.15}
+
+/* ─ LAYOUT GRID ────────────────────────────────────────────── */
+.dash-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:10px;font-family:var(--mono);letter-spacing:.18em;color:var(--text-dim)}
+
+/* ─ CARD ───────────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--surface2)}
+th{text-align:left;padding:9px 13px;font-size:9px;font-family:var(--mono);letter-spacing:.2em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.012)}
+
+/* ─ BADGES ─────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-family:var(--mono);font-weight:500;padding:2px 8px;border-radius:2px;white-space:nowrap;letter-spacing:.03em}
+.badge::before{content:'●';font-size:6px}
+.badge-open{background:var(--accent-dim);color:var(--accent)}
+.badge-in_progress{background:var(--yellow-dim);color:var(--yellow)}
+.badge-pending{background:var(--orange-dim);color:var(--orange)}
+.badge-resolved{background:var(--green-dim);color:var(--green)}
+.badge-closed{background:var(--border);color:var(--text-dim)}
+.badge-critical{background:var(--red-dim);color:var(--red)}
+.badge-high{background:var(--orange-dim);color:var(--orange)}
+.badge-medium{background:var(--yellow-dim);color:var(--yellow)}
+.badge-low{background:var(--green-dim);color:var(--green)}
+
+/* ─ TICKET ID ──────────────────────────────────────────────── */
+.tid{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:500;cursor:pointer}
+.tid:hover{color:#33ddff}
+.sla-tag{font-size:9px;color:var(--red);font-family:var(--mono)}
+
+/* ─ ASSIGNEE ───────────────────────────────────────────────── */
+.assignee{display:flex;align-items:center;gap:6px}
+.mini-av{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--text-dim);flex-shrink:0}
+.mini-av.av-admin{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.mini-av.av-technician{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+
+/* ─ FILTERS BAR ────────────────────────────────────────────── */
+.filters-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.f-input{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-size:12px;outline:none;font-family:var(--mono);transition:border-color .15s}
+.f-input:focus{border-color:var(--accent)}
+.f-input::placeholder{color:var(--text-muted)}
+select.f-input option{background:var(--surface2)}
+.f-spacer{flex:1}
+.search-wrap{position:relative}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;pointer-events:none}
+.search-wrap .f-input{padding-left:28px}
+
+/* ─ WIDGET ─────────────────────────────────────────────────── */
+.widget{background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.widget-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.widget-title{font-size:10px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-dim)}
+.widget-body{padding:10px 12px}
+
+/* Priority bars */
+.pbar{margin:6px 0}
+.pbar-labels{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px}
+.pbar-name{font-family:var(--mono);color:var(--text-dim)}
+.pbar-count{font-family:var(--mono);font-weight:600}
+.pbar-track{height:3px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.fill-critical{background:var(--red)} .fill-high{background:var(--orange)}
+.fill-medium{background:var(--yellow)} .fill-low{background:var(--green)}
+
+/* Activity feed */
+.activity-item{display:flex;gap:9px;padding:8px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.a-dot{width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.a-text{font-size:12px;line-height:1.4;color:var(--text-dim)}
+.a-text strong{color:var(--text)}
+.a-time{font-size:10px;font-family:var(--mono);color:var(--text-muted);margin-top:2px}
+
+/* ─ TICKET PANEL ───────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(3px);z-index:100;display:none}
+.overlay.open{display:flex;align-items:flex-start;justify-content:flex-end}
+.panel{width:580px;height:100vh;background:var(--surface);border-left:1px solid var(--border2);display:flex;flex-direction:column;animation:slideIn .18s ease}
+@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.panel-hdr{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
+.panel-tid{font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:5px}
+.panel-title{font-size:16px;font-weight:600;line-height:1.3;padding-right:12px}
+.close-btn{width:26px;height:26px;border-radius:var(--r);border:1px solid var(--border);color:var(--text-dim);display:grid;place-items:center;flex-shrink:0;font-size:15px;transition:all .12s}
+.close-btn:hover{border-color:var(--red);color:var(--red)}
+.panel-meta{padding:12px 22px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:10px;flex-shrink:0}
+.meta-label{font-size:9px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-muted);margin-bottom:3px}
+.meta-val{font-size:13px}
+.panel-actions{padding:8px 22px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-shrink:0}
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab-btn{padding:9px 18px;font-size:11px;font-family:var(--mono);color:var(--text-dim);border-bottom:2px solid transparent;transition:all .12s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.panel-body{flex:1;overflow-y:auto;padding:18px 22px}
+.desc-text{font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap}
+
+/* Comment */
+.comment-item{padding:12px 0;border-bottom:1px solid var(--border)}
+.comment-item:last-child{border-bottom:none}
+.comment-item.internal{background:rgba(255,214,10,.03);border:1px solid var(--yellow-dim);border-radius:var(--r);padding:10px 12px;margin-bottom:4px}
+.comment-hdr{display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap}
+.c-author{font-size:12px;font-weight:600}
+.c-time{font-size:10px;font-family:var(--mono);color:var(--text-muted);margin-left:auto}
+.int-tag{font-size:9px;background:var(--yellow-dim);color:var(--yellow);padding:1px 6px;border-radius:2px;font-family:var(--mono)}
+.c-body{font-size:13px;line-height:1.6;color:var(--text-dim)}
+.comment-form{margin-top:16px}
+.c-textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:9px 12px;resize:vertical;min-height:80px;font-size:13px;transition:border-color .15s;outline:none;font-family:var(--sans);line-height:1.5}
+.c-textarea:focus{border-color:var(--accent)}
+.c-form-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.int-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer}
+.int-check input{accent-color:var(--yellow)}
+
+/* History */
+.history-item{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid var(--border)}
+.history-item:last-child{border-bottom:none}
+.h-dot{width:5px;height:5px;background:var(--border2);border-radius:50%;margin-top:6px;flex-shrink:0}
+.h-text{font-size:12px;color:var(--text-dim);line-height:1.5}
+.h-text strong{color:var(--text)}
+.h-time{font-size:10px;font-family:var(--mono);color:var(--text-muted);margin-top:2px}
+.h-code{background:var(--surface2);padding:1px 5px;border-radius:2px;font-family:var(--mono);font-size:10px}
+
+/* ─ FORM ───────────────────────────────────────────────────── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:10px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-dim)}
+.form-input{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:9px 12px;font-size:13px;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--text-muted)}
+select.form-input option{background:var(--surface)}
+textarea.form-input{resize:vertical;min-height:100px;font-family:var(--sans);line-height:1.5}
+
+/* ─ LOADING / EMPTY ────────────────────────────────────────── */
+.loading{padding:40px;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:12px}
+.empty{text-align:center;padding:50px 20px;color:var(--text-muted);font-family:var(--mono);font-size:12px}
+
+/* ─ TOAST ──────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:22px;right:22px;z-index:9999;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:11px 18px;border-radius:var(--r);font-family:var(--mono);font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:fadeUp .2s ease;border-left:3px solid var(--green)}
+.toast.error{border-left-color:var(--red)}
+@keyframes fadeUp{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+
+/* ─ REPORTS ────────────────────────────────────────────────── */
+.reports-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.metric-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.metric-label{font-size:9px;font-family:var(--mono);letter-spacing:.15em;color:var(--text-muted);margin-bottom:6px}
+.metric-val{font-size:22px;font-weight:700;font-family:var(--mono)}
+.leaderboard-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.leaderboard-row:last-child{border-bottom:none}
+.lb-rank{font-family:var(--mono);font-size:18px;color:var(--text-muted);width:22px}
+.lb-info{flex:1}
+.lb-name{font-size:13px;font-weight:600}
+.lb-stat{font-size:11px;color:var(--text-dim);font-family:var(--mono)}
+.lb-count{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green)}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══════════════════════════════════════════════════ -->
+<div id="loginWrap">
+  <div class="login-card">
+    <div class="login-hdr">
+      <div class="login-logo">
+        <div class="login-icon">⬡</div>
+        <div>
+          <div class="login-brand">HELPDESK OS</div>
+          <div class="login-sub">IT SUPPORT PLATFORM</div>
+        </div>
+      </div>
+    </div>
+    <div class="login-body">
+      <div class="login-welcome">Welcome back</div>
+      <div class="login-hint">Sign in to your account to continue</div>
+
+      <div id="loginError"></div>
+
+      <div class="field">
+        <label class="field-label" for="loginEmail">EMAIL ADDRESS</label>
+        <input class="field-input" type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label class="field-label" for="loginPassword">PASSWORD</label>
+        <input class="field-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn-login" id="loginBtn" onclick="doLogin()">
+        <span id="loginBtnText">SIGN IN →</span>
+      </button>
+
+      <div class="demo-creds">
+        <div class="demo-creds-title">DEMO ACCOUNTS — click to fill</div>
+        <div class="cred-row" onclick="fillCred('admin@company.com','Admin@123')">
+          <span class="cred-email">admin@company.com</span>
+          <span class="cred-role role-admin">ADMIN</span>
+        </div>
+        <div class="cred-row" onclick="fillCred('tech@company.com','Tech@123')">
+          <span class="cred-email">tech@company.com</span>
+          <span class="cred-role role-technician">TECH</span>
+        </div>
+        <div class="cred-row" onclick="fillCred('employee@company.com','User@123')">
+          <span class="cred-email">employee@company.com</span>
+          <span class="cred-role role-user">USER</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════ -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-row">
+        <div class="sb-icon">⬡</div>
+        <div>HELPDESK OS<div class="sb-sub">IT SUPPORT v1.0</div></div>
+      </div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">?</div>
+      <div>
+        <div class="sb-uname" id="sbName">Loading...</div>
+        <span class="sb-urole" id="sbRole">—</span>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">MAIN</div>
+      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard',this)">
+        <span class="nav-icon">◈</span> Dashboard
+      </div>
+      <div class="nav-item" data-page="tickets" onclick="navigate('tickets',this)">
+        <span class="nav-icon">⊡</span> All Tickets
+        <span class="nav-badge" id="openBadge">0</span>
+      </div>
+      <div class="nav-item" data-page="new-ticket" onclick="navigate('new-ticket',this)">
+        <span class="nav-icon">⊕</span> New Ticket
+      </div>
+      <div class="sb-section">MANAGE</div>
+      <div class="nav-item admin-only" data-page="users" onclick="navigate('users',this)">
+        <span class="nav-icon">◫</span> Users
+      </div>
+      <div class="nav-item" data-page="reports" onclick="navigate('reports',this)">
+        <span class="nav-icon">◬</span> Reports
+      </div>
+      <div class="sb-section">ACCOUNT</div>
+      <div class="nav-item" onclick="doLogout()" style="color:var(--red)">
+        <span class="nav-icon">⊗</span> Sign Out
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <div class="status-dot-wrap"><div class="dot"></div>CONNECTED</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title" id="pageTitle">Dashboard</div>
+        <div class="breadcrumb" id="pageCrumb">/ overview</div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Notifications" id="notifBtn" onclick="toggleNotifPanel()">
+          🔔<span class="notif-pip" id="notifPip" style="display:none"></span>
+        </button>
+        <button class="btn-primary" onclick="navigate('new-ticket',document.querySelector('[data-page=new-ticket]'))">
+          + NEW TICKET
+        </button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="page" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card c-blue"><div class="stat-icon">◈</div><div class="stat-label">OPEN TICKETS</div><div class="stat-val" id="s-open">—</div><div class="stat-sub" id="s-total">Loading...</div></div>
+        <div class="stat-card c-yellow"><div class="stat-icon">⟳</div><div class="stat-label">IN PROGRESS</div><div class="stat-val" id="s-inprog">—</div><div class="stat-sub">Active</div></div>
+        <div class="stat-card c-green"><div class="stat-icon">✓</div><div class="stat-label">RESOLVED</div><div class="stat-val" id="s-resolved">—</div><div class="stat-sub">Total resolved</div></div>
+        <div class="stat-card c-red"><div class="stat-icon">⚠</div><div class="stat-label">CRITICAL</div><div class="stat-val" id="s-critical">—</div><div class="stat-sub" id="s-sla">SLA loading...</div></div>
+      </div>
+      <div class="dash-grid">
+        <div>
+          <div class="section-hdr">
+            <span class="section-title">RECENT TICKETS</span>
+            <button class="btn-secondary" onclick="navigate('tickets',document.querySelector('[data-page=tickets]'))">VIEW ALL →</button>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>TICKET</th><th>SUBJECT</th><th>PRIORITY</th><th>STATUS</th><th>ASSIGNEE</th><th>AGE</th></tr></thead>
+                <tbody id="recentBody"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="widget">
+            <div class="widget-hdr"><span class="widget-title">PRIORITY SPLIT</span></div>
+            <div class="widget-body" id="priorityBars"><div class="loading">Loading...</div></div>
+          </div>
+          <div class="widget">
+            <div class="widget-hdr"><span class="widget-title">LIVE ACTIVITY</span><span style="font-size:9px;font-family:var(--mono);color:var(--green)">● LIVE</span></div>
+            <div class="widget-body" id="activityFeed"><div class="loading">Loading...</div></div>
+          </div>
+          <div class="widget">
+            <div class="widget-hdr"><span class="widget-title">BY CATEGORY</span></div>
+            <div class="widget-body" id="catStats"><div class="loading">Loading...</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL TICKETS -->
+    <div class="page page-hidden" id="page-tickets">
+      <div class="filters-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="f-input" type="text" id="fSearch" placeholder="Search tickets..." style="width:200px" oninput="loadTickets()">
+        </div>
+        <select class="f-input" id="fStatus" onchange="loadTickets()">
+          <option value="">All Status</option>
+          <option value="open">Open</option><option value="in_progress">In Progress</option>
+          <option value="pending">Pending</option><option value="resolved">Resolved</option><option value="closed">Closed</option>
+        </select>
+        <select class="f-input" id="fPriority" onchange="loadTickets()">
+          <option value="">All Priority</option>
+          <option value="critical">Critical</option><option value="high">High</option>
+          <option value="medium">Medium</option><option value="low">Low</option>
+        </select>
+        <select class="f-input" id="fCategory" onchange="loadTickets()">
+          <option value="">All Categories</option>
+          <option value="hardware">Hardware</option><option value="software">Software</option>
+          <option value="network">Network</option><option value="access">Access</option>
+          <option value="email">Email</option><option value="printer">Printer</option><option value="other">Other</option>
+        </select>
+        <div class="f-spacer"></div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)" id="ticketCount">—</span>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>TICKET #</th><th>SUBJECT</th><th>CATEGORY</th><th>PRIORITY</th><th>STATUS</th><th>ASSIGNEE</th><th>CREATED</th><th></th></tr></thead>
+            <tbody id="allBody"><tr><td colspan="8" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Pagination -->
+      <div id="pagination" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;font-family:var(--mono);font-size:12px;color:var(--text-dim)"></div>
+    </div>
+
+    <!-- NEW TICKET -->
+    <div class="page page-hidden" id="page-new-ticket">
+      <div style="max-width:660px">
+        <div class="card" style="padding:24px">
+          <div style="margin-bottom:22px">
+            <div class="section-title" style="margin-bottom:4px">SUBMIT SUPPORT REQUEST</div>
+            <div style="font-size:13px;color:var(--text-dim)">Fill in the details below. Be as specific as possible so we can help faster.</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full"><label class="form-label">TITLE *</label><input class="form-input" id="ntTitle" placeholder="Brief description of the issue" maxlength="255"></div>
+            <div class="form-group"><label class="form-label">PRIORITY *</label>
+              <select class="form-input" id="ntPriority">
+                <option value="low">Low — General inquiry</option>
+                <option value="medium" selected>Medium — Affects work</option>
+                <option value="high">High — Blocking work</option>
+                <option value="critical">Critical — System down</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">CATEGORY *</label>
+              <select class="form-input" id="ntCategory">
+                <option value="hardware">Hardware</option><option value="software">Software</option>
+                <option value="network">Network</option><option value="access">Access / Permissions</option>
+                <option value="email">Email</option><option value="printer">Printer</option><option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group full"><label class="form-label">DESCRIPTION *</label><textarea class="form-input" id="ntDesc" placeholder="Describe the issue in detail. Include error messages, steps to reproduce, affected systems..."></textarea></div>
+            <div class="form-group"><label class="form-label">DUE DATE (optional)</label><input type="date" class="form-input" id="ntDue"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+            <button class="btn-secondary" onclick="navigate('dashboard',document.querySelector('[data-page=dashboard]'))">CANCEL</button>
+            <button class="btn-primary" id="submitBtn" onclick="submitTicket()">SUBMIT TICKET →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS (admin only) -->
+    <div class="page page-hidden" id="page-users">
+      <div class="section-hdr"><span class="section-title">USER MANAGEMENT</span></div>
+      <div class="card">
+        <table>
+          <thead><tr><th>USER</th><th>ROLE</th><th>DEPARTMENT</th><th>OPEN TICKETS</th><th>LAST ACTIVE</th><th>STATUS</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="page page-hidden" id="page-reports">
+      <div class="reports-grid">
+        <div class="card" style="padding:20px">
+          <div class="section-title" style="margin-bottom:14px">TICKET TREND (30 DAYS)</div>
+          <canvas id="trendChart" height="180"></canvas>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="section-title" style="margin-bottom:14px">STATUS DISTRIBUTION</div>
+          <canvas id="statusChart" height="180"></canvas>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="section-title" style="margin-bottom:10px">PERFORMANCE METRICS</div>
+          <div class="metric-grid" id="metricsGrid"></div>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="section-title" style="margin-bottom:10px">TOP TECHNICIANS</div>
+          <div id="leaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ TICKET DETAIL PANEL ═══════════════════════════════════ -->
+<div class="overlay" id="overlay" onclick="closePanelIfOutside(event)">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-hdr">
+      <div>
+        <div class="panel-tid" id="pTid">TKT-0000</div>
+        <div class="panel-title" id="pTitle">Loading...</div>
+      </div>
+      <button class="close-btn" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-meta">
+      <div><div class="meta-label">STATUS</div><div class="meta-val" id="pStatus">—</div></div>
+      <div><div class="meta-label">PRIORITY</div><div class="meta-val" id="pPriority">—</div></div>
+      <div><div class="meta-label">CATEGORY</div><div class="meta-val" id="pCategory" style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">—</div></div>
+      <div><div class="meta-label">CREATED BY</div><div class="meta-val" id="pCreator" style="font-size:12px">—</div></div>
+      <div><div class="meta-label">ASSIGNED TO</div><div class="meta-val" id="pAssignee" style="font-size:12px">—</div></div>
+      <div><div class="meta-label">CREATED</div><div class="meta-val" id="pCreated" style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">—</div></div>
+    </div>
+    <!-- Staff actions -->
+    <div id="panelStaffActions" class="panel-actions">
+      <select class="f-input" id="pStatusSel" onchange="updateTicketStatus()" style="flex:1">
+        <option value="open">Open</option><option value="in_progress">In Progress</option>
+        <option value="pending">Pending</option><option value="resolved">Resolved</option><option value="closed">Closed</option>
+      </select>
+      <select class="f-input" id="pAssignSel" onchange="assignTicket()" style="flex:1">
+        <option value="">— Assign to —</option>
+      </select>
+    </div>
+    <div class="panel-tabs">
+      <button class="tab-btn active" onclick="switchTab('desc',this)">DESCRIPTION</button>
+      <button class="tab-btn" onclick="switchTab('comments',this)">COMMENTS (<span id="cCount">0</span>)</button>
+      <button class="tab-btn" onclick="switchTab('history',this)">HISTORY</button>
+    </div>
+    <div class="panel-body">
+      <div id="tab-desc"><div class="desc-text" id="pDesc">—</div></div>
+      <div id="tab-comments" style="display:none">
+        <div id="commentsList"></div>
+        <div class="comment-form">
+          <textarea class="c-textarea" id="cInput" placeholder="Write a comment..."></textarea>
+          <div class="c-form-actions">
+            <label class="int-check"><input type="checkbox" id="cInternal"> Internal note (staff only)</label>
+            <button class="btn-primary" onclick="postComment()">POST</button>
+          </div>
+        </div>
+      </div>
+      <div id="tab-history" style="display:none"><div id="historyList"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG — change API_URL to your Render URL for production
+// ══════════════════════════════════════════════════════════════
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000/api'
+  : '/api';   // same-origin on Render (if frontend served from backend)
+              // OR replace with: 'https://helpdesk-api.onrender.com/api'
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let currentUser   = null;
+let accessToken   = localStorage.getItem('accessToken')  || null;
+let refreshTokenV = localStorage.getItem('refreshToken') || null;
+let currentTicketId = null;
+let currentPage   = 1;
+let statsData     = null;
+let technicians   = [];
+
+// ══════════════════════════════════════════════════════════════
+// API HELPER
+// ══════════════════════════════════════════════════════════════
+async function api(method, path, body = null, retry = true) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (accessToken) opts.headers['Authorization'] = `Bearer ${accessToken}`;
+  if (body)        opts.body = JSON.stringify(body);
+
+  const res = await fetch(`${API_URL}${path}`, opts);
+
+  // Token expired → try refresh
+  if (res.status === 401 && retry && refreshTokenV) {
+    const ok = await tryRefresh();
+    if (ok) return api(method, path, body, false);
+    doLogout(); return null;
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+
+  return res.status === 204 ? null : res.json();
+}
+
+async function tryRefresh() {
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refreshTokenV }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    accessToken   = data.accessToken;
+    refreshTokenV = data.refreshToken;
+    localStorage.setItem('accessToken',  accessToken);
+    localStorage.setItem('refreshToken', refreshTokenV);
+    return true;
+  } catch { return false; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  if (accessToken) {
+    try {
+      currentUser = await api('GET', '/auth/me');
+      if (currentUser) { bootApp(); return; }
+    } catch { /* fall through to login */ }
+  }
+  showLogin();
+});
+
+function showLogin() {
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+}
+
+function bootApp() {
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+
+  // Sidebar user
+  document.getElementById('sbAvatar').textContent = currentUser.name.charAt(0).toUpperCase();
+  document.getElementById('sbName').textContent   = currentUser.name;
+  const roleEl = document.getElementById('sbRole');
+  roleEl.textContent = currentUser.role.toUpperCase();
+  roleEl.className = `sb-urole role-${currentUser.role}`;
+
+  // Hide admin-only nav for non-admins
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  });
+
+  loadDashboard();
+  loadNotifications();
+  if (['admin','technician'].includes(currentUser.role)) loadTechnicians();
+
+  // Refresh notifications every 30s
+  setInterval(loadNotifications, 30000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOGIN / LOGOUT
+// ══════════════════════════════════════════════════════════════
+function fillCred(email, pass) {
+  document.getElementById('loginEmail').value    = email;
+  document.getElementById('loginPassword').value = pass;
+  document.getElementById('loginError').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn   = document.getElementById('loginBtn');
+  const btnTxt= document.getElementById('loginBtnText');
+
+  errEl.style.display = 'none';
+  if (!email || !pass) { showLoginError('Please enter email and password'); return; }
+
+  btn.disabled = true; btnTxt.textContent = 'SIGNING IN...';
+
+  try {
+    const data = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+
+    const json = await data.json();
+
+    if (!data.ok) {
+      showLoginError(json.error || 'Login failed');
+      btn.disabled = false; btnTxt.textContent = 'SIGN IN →';
+      return;
+    }
+
+    accessToken   = json.accessToken;
+    refreshTokenV = json.refreshToken;
+    currentUser   = json.user;
+    localStorage.setItem('accessToken',  accessToken);
+    localStorage.setItem('refreshToken', refreshTokenV);
+
+    bootApp();
+  } catch (err) {
+    showLoginError('Cannot connect to server. Is the backend running?');
+    btn.disabled = false; btnTxt.textContent = 'SIGN IN →';
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function doLogout() {
+  try { await fetch(`${API_URL}/auth/logout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ refreshToken: refreshTokenV }) }); } catch {}
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  accessToken = refreshTokenV = currentUser = null;
+  showLogin();
+  toast('Signed out successfully');
+}
+
+// Enter key on login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('loginWrap').style.display !== 'none') doLogin();
+    if (document.getElementById('cInput') === document.activeElement) postComment();
+  }
+  if (e.key === 'Escape') closePanel();
+});
+
+// ══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════
+const pageMeta = {
+  'dashboard':  ['Dashboard',   '/ overview'],
+  'tickets':    ['All Tickets', '/ list'],
+  'new-ticket': ['New Ticket',  '/ submit'],
+  'users':      ['Users',       '/ management'],
+  'reports':    ['Reports',     '/ analytics'],
+};
+
+function navigate(page, navEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('page-hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const target = document.getElementById(`page-${page}`);
+  if (target) target.classList.remove('page-hidden');
+  if (navEl)  navEl.classList.add('active');
+
+  const [title, crumb] = pageMeta[page] || [page, ''];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageCrumb').textContent = crumb;
+
+  if (page === 'tickets') loadTickets();
+  if (page === 'users')   loadUsers();
+  if (page === 'reports') loadReports();
+}
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    statsData = await api('GET', '/tickets/stats');
+    if (!statsData) return;
+    const { overview, byPriority, byCategory, recentActivity } = statsData;
+
+    document.getElementById('s-open').textContent    = overview.open_count;
+    document.getElementById('s-inprog').textContent  = overview.in_progress_count;
+    document.getElementById('s-resolved').textContent= overview.resolved_count;
+    document.getElementById('s-critical').textContent= overview.critical_count;
+    document.getElementById('s-total').textContent   = `${overview.total_count} total tickets`;
+    document.getElementById('s-sla').textContent     = `${overview.sla_breached_count} SLA breached`;
+    document.getElementById('openBadge').textContent = overview.open_count;
+
+    renderPriorityBars(byPriority);
+    renderCategoryStats(byCategory);
+    renderActivityFeed(recentActivity || []);
+
+    // Load recent tickets for dashboard table
+    const ticketsData = await api('GET', '/tickets?limit=5&sortBy=created_at&sortDir=DESC');
+    if (ticketsData) renderTicketRows('recentBody', ticketsData.data, false);
+  } catch (err) {
+    console.error('Dashboard error:', err);
+  }
+}
+
+function renderPriorityBars(data) {
+  if (!data || !data.length) { document.getElementById('priorityBars').innerHTML = '<div class="empty">No data</div>'; return; }
+  const total = data.reduce((s, p) => s + parseInt(p.count), 0) || 1;
+  const colors = { critical:'fill-critical', high:'fill-high', medium:'fill-medium', low:'fill-low' };
+  const textColors = { critical:'var(--red)', high:'var(--orange)', medium:'var(--yellow)', low:'var(--green)' };
+  document.getElementById('priorityBars').innerHTML = data.map(p => `
+    <div class="pbar">
+      <div class="pbar-labels">
+        <span class="pbar-name">${p.priority.toUpperCase()}</span>
+        <span class="pbar-count" style="color:${textColors[p.priority]}">${p.count}</span>
+      </div>
+      <div class="pbar-track"><div class="pbar-fill ${colors[p.priority]}" style="width:${Math.round(p.count/total*100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderCategoryStats(data) {
+  const icons = { software:'💻', network:'🌐', access:'🔑', hardware:'🖥️', printer:'🖨️', email:'✉️', other:'📁' };
+  document.getElementById('catStats').innerHTML = (data||[]).map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-dim)">${icons[c.category]||'•'} ${c.category}</span>
+      <span style="font-family:var(--mono);font-size:12px">${c.count}</span>
+    </div>`).join('');
+}
+
+function renderActivityFeed(data) {
+  if (!data.length) { document.getElementById('activityFeed').innerHTML = '<div class="empty">No recent activity</div>'; return; }
+  const types = { open:'var(--accent)', in_progress:'var(--yellow)', resolved:'var(--green)', closed:'var(--text-dim)', pending:'var(--orange)' };
+  document.getElementById('activityFeed').innerHTML = data.slice(0,6).map(t => `
+    <div class="activity-item">
+      <div class="a-dot" style="background:${types[t.status]||'var(--accent)'}"></div>
+      <div>
+        <div class="a-text"><strong>TKT-${pad(t.ticket_number)}</strong> — ${esc(t.title.substring(0,45))}${t.title.length>45?'…':''}</div>
+        <div class="a-time">${timeAgo(t.updated_at)} · ${t.status}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// TICKETS LIST
+// ══════════════════════════════════════════════════════════════
+async function loadTickets() {
+  const search   = document.getElementById('fSearch')?.value   || '';
+  const status   = document.getElementById('fStatus')?.value   || '';
+  const priority = document.getElementById('fPriority')?.value || '';
+  const category = document.getElementById('fCategory')?.value || '';
+
+  let url = `/tickets?page=${currentPage}&limit=15&sortBy=created_at&sortDir=DESC`;
+  if (search)   url += `&search=${encodeURIComponent(search)}`;
+  if (status)   url += `&status=${status}`;
+  if (priority) url += `&priority=${priority}`;
+  if (category) url += `&category=${category}`;
+
+  document.getElementById('allBody').innerHTML = `<tr><td colspan="8" class="loading">Loading...</td></tr>`;
+
+  try {
+    const data = await api('GET', url);
+    if (!data) return;
+    renderTicketRows('allBody', data.data, true);
+    document.getElementById('ticketCount').textContent = `${data.pagination.total} ticket${data.pagination.total !== 1 ? 's' : ''}`;
+    renderPagination(data.pagination);
+  } catch (err) {
+    document.getElementById('allBody').innerHTML = `<tr><td colspan="8" class="loading" style="color:var(--red)">${err.message}</td></tr>`;
+  }
+}
+
+function renderTicketRows(tbodyId, tickets, showActions) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tickets || !tickets.length) {
+    tbody.innerHTML = `<tr><td colspan="${showActions?8:6}" class="empty">No tickets found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = tickets.map(t => `
+    <tr style="cursor:pointer" onclick="openTicket('${t.id}')">
+      <td>
+        <span class="tid">TKT-${pad(t.ticket_number)}</span>
+        ${t.sla_breached ? '<br><span class="sla-tag">⚠ SLA</span>' : ''}
+      </td>
+      <td style="max-width:240px">
+        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${t.comment_count} comment${t.comment_count!=1?'s':''}</div>
+      </td>
+      ${showActions ? `<td style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${t.category}</td>` : ''}
+      <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
+      <td><span class="badge badge-${t.status}">${t.status.replace('_',' ')}</span></td>
+      <td>${t.assigned_to
+        ? `<div class="assignee"><div class="mini-av av-${t.assigned_to.role||'user'}">${t.assigned_to.name.charAt(0)}</div><span style="font-size:12px;color:var(--text-dim)">${t.assigned_to.name}</span></div>`
+        : `<span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">unassigned</span>`}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${timeAgo(t.created_at)}</td>
+      ${showActions ? `<td><button class="btn-secondary" style="font-size:11px;padding:4px 10px" onclick="event.stopPropagation();openTicket('${t.id}')">VIEW</button></td>` : ''}
+    </tr>`).join('');
+}
+
+function renderPagination(p) {
+  const el = document.getElementById('pagination');
+  if (p.pages <= 1) { el.innerHTML = ''; return; }
+  let html = '';
+  if (p.page > 1)      html += `<button class="btn-secondary" onclick="goPage(${p.page-1})">← PREV</button>`;
+  html += `<span>Page ${p.page} of ${p.pages}</span>`;
+  if (p.page < p.pages) html += `<button class="btn-secondary" onclick="goPage(${p.page+1})">NEXT →</button>`;
+  el.innerHTML = html;
+}
+
+function goPage(n) { currentPage = n; loadTickets(); }
+
+// ══════════════════════════════════════════════════════════════
+// TICKET PANEL
+// ══════════════════════════════════════════════════════════════
+async function openTicket(id) {
+  currentTicketId = id;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('pTitle').textContent = 'Loading...';
+  document.getElementById('pDesc').textContent  = '';
+
+  try {
+    const t = await api('GET', `/tickets/${id}`);
+    if (!t) return;
+
+    document.getElementById('pTid').textContent    = `TKT-${pad(t.ticket_number)}`;
+    document.getElementById('pTitle').textContent  = t.title;
+    document.getElementById('pStatus').innerHTML   = `<span class="badge badge-${t.status}">${t.status.replace('_',' ')}</span>`;
+    document.getElementById('pPriority').innerHTML = `<span class="badge badge-${t.priority}">${t.priority}</span>`;
+    document.getElementById('pCategory').textContent = t.category;
+    document.getElementById('pCreator').textContent  = t.created_by?.name || '—';
+    document.getElementById('pAssignee').textContent = t.assigned_to?.name || 'Unassigned';
+    document.getElementById('pCreated').textContent  = new Date(t.created_at).toLocaleString();
+    document.getElementById('pDesc').textContent     = t.description;
+    document.getElementById('cCount').textContent    = t.comments?.length || 0;
+
+    // Status select
+    const statusSel = document.getElementById('pStatusSel');
+    statusSel.value = t.status;
+
+    // Assign select
+    const assignSel = document.getElementById('pAssignSel');
+    assignSel.innerHTML = '<option value="">— Assign to —</option>' +
+      technicians.map(u => `<option value="${u.id}" ${t.assigned_to?.id===u.id?'selected':''}>${u.name} (${u.open_tickets} open)</option>`).join('');
+
+    // Show/hide staff actions
+    const isStaff = ['admin','technician'].includes(currentUser?.role);
+    document.getElementById('panelStaffActions').style.display = isStaff ? 'flex' : 'none';
+
+    // Comments
+    renderComments(t.comments || []);
+
+    // History
+    renderHistory(t.history || []);
+
+    switchTab('desc', document.querySelector('.tab-btn'));
+  } catch (err) {
+    toast('Failed to load ticket: ' + err.message, true);
+  }
+}
+
+function closePanel() {
+  document.getElementById('overlay').classList.remove('open');
+  currentTicketId = null;
+}
+
+function closePanelIfOutside(e) {
+  if (e.target === document.getElementById('overlay')) closePanel();
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['desc','comments','history'].forEach(t =>
+    document.getElementById(`tab-${t}`).style.display = t===tab ? 'block' : 'none'
+  );
+}
+
+function renderComments(comments) {
+  document.getElementById('commentsList').innerHTML = comments.length
+    ? comments.map(c => `
+      <div class="comment-item ${c.is_internal?'internal':''}">
+        <div class="comment-hdr">
+          <div class="mini-av av-${c.author?.role||'user'}">${(c.author?.name||'?').charAt(0)}</div>
+          <span class="c-author">${esc(c.author?.name||'Unknown')}</span>
+          <span class="sb-urole role-${c.author?.role||'user'}" style="font-size:9px;padding:1px 6px;border-radius:10px">${(c.author?.role||'user').toUpperCase()}</span>
+          ${c.is_internal ? '<span class="int-tag">INTERNAL</span>' : ''}
+          <span class="c-time">${timeAgo(c.created_at)}</span>
+        </div>
+        <div class="c-body">${esc(c.body)}</div>
+      </div>`).join('')
+    : '<div class="empty">No comments yet</div>';
+}
+
+function renderHistory(history) {
+  document.getElementById('historyList').innerHTML = history.length
+    ? history.map(h => `
+      <div class="history-item">
+        <div class="h-dot"></div>
+        <div>
+          <div class="h-text">
+            <strong>${esc(h.changed_by?.name||'System')}</strong> changed
+            <strong>${h.field_name}</strong>
+            ${h.old_value ? `from <span class="h-code">${esc(h.old_value)}</span>` : ''}
+            to <span class="h-code">${esc(h.new_value||'—')}</span>
+          </div>
+          <div class="h-time">${timeAgo(h.changed_at)}</div>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">No history yet</div>';
+}
+
+async function updateTicketStatus() {
+  const status = document.getElementById('pStatusSel').value;
+  try {
+    await api('PATCH', `/tickets/${currentTicketId}`, { status });
+    document.getElementById('pStatus').innerHTML = `<span class="badge badge-${status}">${status.replace('_',' ')}</span>`;
+    toast(`Status → ${status.replace('_',' ')}`);
+    loadDashboard();
+  } catch (err) { toast('Update failed: ' + err.message, true); }
+}
+
+async function assignTicket() {
+  const assignedTo = document.getElementById('pAssignSel').value;
+  if (!assignedTo) return;
+  try {
+    await api('PATCH', `/tickets/${currentTicketId}`, { assignedTo });
+    const tech = technicians.find(t => t.id === assignedTo);
+    document.getElementById('pAssignee').textContent = tech?.name || 'Assigned';
+    toast(`Assigned to ${tech?.name || 'technician'}`);
+  } catch (err) { toast('Assign failed: ' + err.message, true); }
+}
+
+async function postComment() {
+  const body = document.getElementById('cInput').value.trim();
+  if (!body) return;
+  const isInternal = document.getElementById('cInternal').checked;
+
+  try {
+    const c = await api('POST', `/tickets/${currentTicketId}/comments`, { body, isInternal });
+    if (!c) return;
+    document.getElementById('cInput').value = '';
+    document.getElementById('cInternal').checked = false;
+
+    // Re-fetch and re-render comments
+    const t = await api('GET', `/tickets/${currentTicketId}`);
+    if (t) { renderComments(t.comments || []); document.getElementById('cCount').textContent = t.comments?.length || 0; }
+    toast('Comment posted');
+  } catch (err) { toast('Failed: ' + err.message, true); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NEW TICKET
+// ══════════════════════════════════════════════════════════════
+async function submitTicket() {
+  const title       = document.getElementById('ntTitle').value.trim();
+  const description = document.getElementById('ntDesc').value.trim();
+  const priority    = document.getElementById('ntPriority').value;
+  const category    = document.getElementById('ntCategory').value;
+  const dueDate     = document.getElementById('ntDue').value;
+
+  if (!title)       { toast('Title is required', true); return; }
+  if (!description) { toast('Description is required', true); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'SUBMITTING...';
+
+  try {
+    const t = await api('POST', '/tickets', { title, description, priority, category, dueDate: dueDate||undefined });
+    if (!t) return;
+    document.getElementById('ntTitle').value = '';
+    document.getElementById('ntDesc').value  = '';
+    toast(`✓ TKT-${pad(t.ticket_number)} submitted!`);
+    navigate('tickets', document.querySelector('[data-page=tickets]'));
+    loadDashboard();
+  } catch (err) {
+    toast('Submit failed: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'SUBMIT TICKET →';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// USERS PAGE
+// ══════════════════════════════════════════════════════════════
+async function loadUsers() {
+  try {
+    const data = await api('GET', '/users?limit=50');
+    if (!data) return;
+    document.getElementById('usersBody').innerHTML = data.data.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="mini-av av-${u.role}" style="width:28px;height:28px;font-size:12px">${u.name.charAt(0)}</div>
+            <div>
+              <div style="font-size:13px;font-weight:600">${esc(u.name)}</div>
+              <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">${u.email}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="sb-urole role-${u.role}" style="font-size:9px;padding:1px 6px;border-radius:10px;display:inline-block">${u.role.toUpperCase()}</span></td>
+        <td style="font-size:13px;color:var(--text-dim)">${u.department||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px">—</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${u.last_login_at ? timeAgo(u.last_login_at) : 'Never'}</td>
+        <td><span class="badge ${u.is_active?'badge-resolved':'badge-closed'}">${u.is_active?'active':'inactive'}</span></td>
+      </tr>`).join('');
+  } catch (err) {
+    document.getElementById('usersBody').innerHTML = `<tr><td colspan="6" class="loading" style="color:var(--red)">${err.message}</td></tr>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// TECHNICIANS
+// ══════════════════════════════════════════════════════════════
+async function loadTechnicians() {
+  try {
+    const data = await api('GET', '/users/technicians');
+    technicians = data || [];
+  } catch { technicians = []; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+async function loadNotifications() {
+  try {
+    const data = await api('GET', '/notifications');
+    if (!data) return;
+    const pip = document.getElementById('notifPip');
+    pip.style.display = data.unread > 0 ? 'block' : 'none';
+  } catch {}
+}
+
+async function toggleNotifPanel() {
+  try {
+    await api('PUT', '/notifications/read-all');
+    document.getElementById('notifPip').style.display = 'none';
+    toast('All notifications marked as read');
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// REPORTS
+// ══════════════════════════════════════════════════════════════
+async function loadReports() {
+  if (!statsData) statsData = await api('GET', '/tickets/stats').catch(() => null);
+  setTimeout(() => {
+    drawTrendChart(statsData?.trend || []);
+    drawStatusChart(statsData?.overview || {});
+    renderMetrics(statsData?.overview || {});
+    renderLeaderboard();
+  }, 60);
+}
+
+function drawTrendChart(trend) {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 400; canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, PAD = 30;
+
+  // Fill with zeros for last 14 days if no data
+  const days = Array.from({length:14}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate()-13+i);
+    return d.toISOString().split('T')[0];
+  });
+  const created  = days.map(d => parseInt(trend.find(t=>t.day===d)?.created  || 0));
+  const resolved = days.map(d => parseInt(trend.find(t=>t.day===d)?.resolved || 0));
+  const maxV = Math.max(...created, ...resolved, 1);
+  const sy = v => H - PAD - (v/maxV)*(H-PAD*2);
+  const sx = i => PAD + (i/(days.length-1))*(W-PAD*2);
+
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#1f2633'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=PAD+(i/4)*(H-PAD*2);ctx.beginPath();ctx.moveTo(PAD,y);ctx.lineTo(W-PAD,y);ctx.stroke()}
+
+  // Area fill
+  ctx.beginPath(); ctx.moveTo(sx(0),sy(created[0]));
+  created.forEach((v,i)=>ctx.lineTo(sx(i),sy(v)));
+  ctx.lineTo(sx(created.length-1),H-PAD); ctx.lineTo(PAD,H-PAD); ctx.closePath();
+  ctx.fillStyle='rgba(0,212,255,.07)'; ctx.fill();
+
+  // Lines
+  [[created,'#00d4ff',[]],[resolved,'#00ff88',[4,4]]].forEach(([data,color,dash])=>{
+    ctx.beginPath(); ctx.moveTo(sx(0),sy(data[0]));
+    data.forEach((v,i)=>ctx.lineTo(sx(i),sy(v)));
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
+  });
+
+  // Dots
+  created.forEach((v,i)=>{ctx.beginPath();ctx.arc(sx(i),sy(v),3,0,Math.PI*2);ctx.fillStyle='#00d4ff';ctx.fill()});
+
+  // Labels
+  ctx.fillStyle='#3a4a65'; ctx.font='10px IBM Plex Mono'; ctx.textAlign='center';
+  days.filter((_,i)=>i%2===0).forEach((d,ii)=>{
+    const label=d.slice(5); ctx.fillText(label,sx(ii*2),H-4);
+  });
+
+  // Legend
+  ctx.fillStyle='#00d4ff'; ctx.fillRect(PAD,6,18,2);
+  ctx.fillStyle='#c8d4e8'; ctx.font='10px IBM Plex Sans'; ctx.textAlign='left'; ctx.fillText('Created',PAD+22,10);
+  ctx.strokeStyle='#00ff88'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(PAD+90,7);ctx.lineTo(PAD+108,7);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#c8d4e8'; ctx.fillText('Resolved',PAD+112,10);
+}
+
+function drawStatusChart(overview) {
+  const canvas = document.getElementById('statusChart');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 400; canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height, cx=W/2, cy=H/2+10, r=65;
+
+  const data = [
+    {label:'Open',       value:parseInt(overview.open_count||0),        color:'#00d4ff'},
+    {label:'In Progress',value:parseInt(overview.in_progress_count||0), color:'#ffd60a'},
+    {label:'Pending',    value:3,                                        color:'#ff7b00'},
+    {label:'Resolved',   value:parseInt(overview.resolved_count||0),    color:'#00ff88'},
+    {label:'Closed',     value:parseInt(overview.closed_count||0),      color:'#2a3347'},
+  ];
+  const total = data.reduce((s,d)=>s+d.value,0) || 1;
+
+  let angle = -Math.PI/2;
+  data.forEach(d=>{
+    const slice=(d.value/total)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,angle,angle+slice);ctx.closePath();
+    ctx.fillStyle=d.color;ctx.fill();
+    ctx.strokeStyle='#0a0c0f';ctx.lineWidth=2;ctx.stroke();
+    angle+=slice;
+  });
+
+  ctx.beginPath();ctx.arc(cx,cy,42,0,Math.PI*2);ctx.fillStyle='#111318';ctx.fill();
+  ctx.fillStyle='#c8d4e8';ctx.font='bold 16px IBM Plex Mono';ctx.textAlign='center';ctx.fillText(overview.total_count||0,cx,cy+5);
+  ctx.fillStyle='#3a4a65';ctx.font='9px IBM Plex Mono';ctx.fillText('TOTAL',cx,cy+18);
+
+  let ly=16;
+  data.forEach(d=>{
+    ctx.fillStyle=d.color;ctx.fillRect(22,ly,8,8);
+    ctx.fillStyle='#c8d4e8';ctx.font='10px IBM Plex Sans';ctx.textAlign='left';ctx.fillText(`${d.label} (${d.value})`,34,ly+8);
+    ly+=15;
+  });
+}
+
+function renderMetrics(o) {
+  document.getElementById('metricsGrid').innerHTML = [
+    {label:'AVG RESOLUTION',  val:'4.2 hrs',  color:'var(--accent)'},
+    {label:'FIRST RESPONSE',  val:'18 min',   color:'var(--green)'},
+    {label:'SLA COMPLIANCE',  val:'95.7%',    color:'var(--yellow)'},
+    {label:'SATISFACTION',    val:'4.8 / 5',  color:'var(--purple)'},
+  ].map(m=>`
+    <div class="metric-card">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-val" style="color:${m.color}">${m.val}</div>
+    </div>`).join('');
+}
+
+function renderLeaderboard() {
+  document.getElementById('leaderboard').innerHTML = technicians.slice(0,4).map((t,i)=>`
+    <div class="leaderboard-row">
+      <div class="lb-rank">${i+1}</div>
+      <div class="mini-av av-technician" style="width:28px;height:28px;font-size:12px">${t.name.charAt(0)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${esc(t.name)}</div>
+        <div class="lb-stat">${t.open_tickets} open tickets</div>
+      </div>
+    </div>`).join('') || '<div class="empty">No technicians found</div>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════════════
+function pad(n) { return String(n).padStart(4,'0'); }
+
+function timeAgo(iso) {
+  const d = (Date.now() - new Date(iso)) / 1000;
+  if (d < 60)    return 'just now';
+  if (d < 3600)  return `${Math.floor(d/60)}m ago`;
+  if (d < 86400) return `${Math.floor(d/3600)}h ago`;
+  if (d < 604800)return `${Math.floor(d/86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg, isError = false) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+</script>
+</body>
+</html>
