@@ -1,6 +1,7 @@
-// src/config/database.js
+cat > config/database.js << 'EOF'
+// config/database.js
 import pg from 'pg';
-import { logger } from '../utils/logger.js';
+import { logger } from './utils/logger.js';
 
 const { Pool } = pg;
 
@@ -8,7 +9,7 @@ const pool = new Pool({
   host:     process.env.DB_HOST     || 'localhost',
   port:     parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME     || 'helpdesk',
-  user:     process.env.DB_USER     || 'postgres',
+  user:     process.env.DB_USER     || 'sawjoshuahtoo',
   password: process.env.DB_PASSWORD || '',
   min:      parseInt(process.env.DB_POOL_MIN || '2'),
   max:      parseInt(process.env.DB_POOL_MAX || '10'),
@@ -19,7 +20,7 @@ const pool = new Pool({
     : false,
 });
 
-pool.on('error', (err) => logger.error('Unexpected DB pool error:', err));
+pool.on('error', (err) => console.error('Unexpected DB pool error:', err));
 
 export const query = (text, params) => pool.query(text, params);
 
@@ -41,11 +42,13 @@ export const withTransaction = async (fn) => {
 export const testConnection = async () => {
   try {
     const res = await query('SELECT NOW() AS now');
+    console.log(`✅ Database connected at ${res.rows[0].now}`);
     logger.info(`✅ Database connected at ${res.rows[0].now}`);
   } catch (err) {
-    logger.error('❌ Database connection failed:', err.message);
+    console.error('❌ Database connection failed:', err);
     process.exit(1);
   }
 };
 
 export default pool;
+EOF
