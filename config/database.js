@@ -2,20 +2,16 @@ import pg from 'pg';
 const { Pool } = pg;
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'helpdesk',
-  user: process.env.DB_USER || 'sawjoshuahtoo',
-  password: process.env.DB_PASSWORD || '',
-  min: parseInt(process.env.DB_POOL_MIN || '2'),
-  max: parseInt(process.env.DB_POOL_MAX || '10'),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 pool.on('error', (err) => console.error('DB pool error:', err));
+
 export const query = (text, params) => pool.query(text, params);
+
 export const withTransaction = async (fn) => {
   const client = await pool.connect();
   try {
@@ -30,6 +26,7 @@ export const withTransaction = async (fn) => {
     client.release();
   }
 };
+
 export const testConnection = async () => {
   try {
     const res = await query('SELECT NOW() AS now');
@@ -39,4 +36,5 @@ export const testConnection = async () => {
     process.exit(1);
   }
 };
+
 export default pool;
