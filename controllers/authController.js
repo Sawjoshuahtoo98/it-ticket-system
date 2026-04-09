@@ -1,115 +1,205 @@
-// src/controllers/authController.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../config/database.js';
-import { generateTokens } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { validationResult } from 'express-validator';
 
-const storeRefresh = async (userId, token) => {
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
-  const exp  = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await query(
-    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,$3)',
-    [userId, hash, exp]
-  );
+// ── Create refresh token hash ─────────────────────
+const hashToken = (token) => {
+  return crypto.createHash('sha256').update(token).digest('hex');
 };
 
-// POST /auth/register
+// ── REGISTER ─────────────────────────────────────
 export const register = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   const { name, email, password, department, phone } = req.body;
-  const hash = await bcrypt.hash(password, 12);
 
-  const { rows } = await query(
+  // hash password (IMPORTANT)
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const result = await query(
     `INSERT INTO users (name, email, password_hash, department, phone)
      VALUES ($1,$2,$3,$4,$5)
-     RETURNING id, name, email, role, department`,
-    [name, email, hash, department || null, phone || null]
+     RETURNING id, name, email, role`,
+    [name, email, passwordHash, department || null, phone || null]
   );
 
-  const user = rows[0];
-  const tokens = generateTokens(user.id, user.role);
-  await storeRefresh(user.id, tokens.refreshToken);
+  const user = result.rows[0];
 
-  res.status(201).json({ user, ...tokens });
+  const accessToken = jwt.sign(
+    { sub: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  const refreshToken = jwt.sign(
+    { sub: user.id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  await query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+     VALUES ($1,$2, NOW() + INTERVAL '7 days')`,
+    [user.id, hashToken(refreshToken)]
+  );
+
+  res.status(201).json({
+    user,
+    accessToken,
+    refreshToken
+  });
 });
 
-// POST /auth/login
+// ── LOGIN ─────────────────────────────────────
 export const login = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   const { email, password } = req.body;
 
-  const { rows } = await query(
-    'SELECT * FROM users WHERE email=$1 AND is_active=TRUE',
+  const result = await query(
+    `SELECT * FROM users WHERE email=$1 AND is_active=TRUE`,
     [email]
   );
-  if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const user = rows[0];
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  const user = result.rows[0];
 
-  await query('UPDATE users SET last_login_at=NOW() WHERE id=$1', [user.id]);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
 
-  const tokens = generateTokens(user.id, user.role);
-  await storeRefresh(user.id, tokens.refreshToken);
+  const isMatch = await bcrypt.compare(password, user.password_hash);
 
-  const { password_hash, ...safe } = user;
-  res.json({ user: safe, ...tokens });
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  await query(
+    `UPDATE users SET last_login_at=NOW() WHERE id=$1`,
+    [user.id]
+  );
+
+  const accessToken = jwt.sign(
+    { sub: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  const refreshToken = jwt.sign(
+    { sub: user.id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  await query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+     VALUES ($1,$2, NOW() + INTERVAL '7 days')`,
+    [user.id, hashToken(refreshToken)]
+  );
+
+  const { password_hash, ...safeUser } = user;
+
+  res.json({
+    user: safeUser,
+    accessToken,
+    refreshToken
+  });
 });
 
-// POST /auth/refresh
+// ── REFRESH TOKEN ─────────────────────────────
 export const refresh = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(401).json({ error: 'Refresh token required' });
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Refresh token required' });
+  }
 
   let payload;
+
   try {
     payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
   } catch {
-    return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    return res.status(401).json({ error: 'Invalid refresh token' });
   }
 
-  const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-  const { rows } = await query(
-    'SELECT * FROM refresh_tokens WHERE token_hash=$1 AND expires_at > NOW()',
-    [hash]
+  const tokenHash = hashToken(refreshToken);
+
+  const result = await query(
+    `SELECT * FROM refresh_tokens
+     WHERE token_hash=$1 AND expires_at > NOW()`,
+    [tokenHash]
   );
-  if (!rows.length) return res.status(401).json({ error: 'Token revoked or expired' });
 
-  // Rotate — delete old, issue new
-  await query('DELETE FROM refresh_tokens WHERE token_hash=$1', [hash]);
+  if (!result.rows.length) {
+    return res.status(401).json({ error: 'Token expired or revoked' });
+  }
 
-  const userRes = await query('SELECT role FROM users WHERE id=$1 AND is_active=TRUE', [payload.sub]);
-  if (!userRes.rows.length) return res.status(401).json({ error: 'User not found' });
+  await query(`DELETE FROM refresh_tokens WHERE token_hash=$1`, [tokenHash]);
 
-  const tokens = generateTokens(payload.sub, userRes.rows[0].role);
-  await storeRefresh(payload.sub, tokens.refreshToken);
+  const userRes = await query(
+    `SELECT id, role FROM users WHERE id=$1 AND is_active=TRUE`,
+    [payload.sub]
+  );
 
-  res.json(tokens);
+  if (!userRes.rows.length) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+
+  const user = userRes.rows[0];
+
+  const newAccessToken = jwt.sign(
+    { sub: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  const newRefreshToken = jwt.sign(
+    { sub: user.id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  await query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+     VALUES ($1,$2, NOW() + INTERVAL '7 days')`,
+    [user.id, hashToken(newRefreshToken)]
+  );
+
+  res.json({
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken
+  });
 });
 
-// POST /auth/logout
+// ── LOGOUT ─────────────────────────────────────
 export const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
+
   if (refreshToken) {
-    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    await query('DELETE FROM refresh_tokens WHERE token_hash=$1', [hash]);
+    await query(
+      `DELETE FROM refresh_tokens WHERE token_hash=$1`,
+      [hashToken(refreshToken)]
+    );
   }
-  res.json({ message: 'Logged out successfully' });
+
+  res.json({ message: 'Logged out' });
 });
 
-// GET /auth/me
+// ── ME ─────────────────────────────────────
 export const me = asyncHandler(async (req, res) => {
-  const { rows } = await query(
-    'SELECT id, name, email, role, department, phone, avatar_url, last_login_at, created_at FROM users WHERE id=$1',
+  const result = await query(
+    `SELECT id, name, email, role, department, phone, avatar_url, last_login_at, created_at
+     FROM users WHERE id=$1`,
     [req.user.id]
   );
-  res.json(rows[0]);
+
+  res.json(result.rows[0]);
 });
