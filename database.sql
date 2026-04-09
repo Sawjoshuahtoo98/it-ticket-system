@@ -1,220 +1,232 @@
 -- ============================================================
--- HELPDESK IT SUPPORT — COMPLETE DATABASE SCHEMA
+-- HELPDESK IT SUPPORT SYSTEM
 -- PostgreSQL 14+
--- Run: psql -U postgres -d helpdesk -f database.sql
+-- Compatible with Node.js + Render
+-- UUID-based auth system
 -- ============================================================
 
--- Extensions
+-- ─────────────────────────────────────────────
+-- EXTENSIONS
+-- ─────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ── Enums ────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────
+-- ENUM TYPES
+-- ─────────────────────────────────────────────
+
 DO $$ BEGIN
-  CREATE TYPE user_role      AS ENUM ('admin','user','technician');
-  EXCEPTION WHEN duplicate_object THEN NULL;
+  CREATE TYPE user_role AS ENUM ('admin','user','technician');
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
 DO $$ BEGIN
-  CREATE TYPE ticket_status  AS ENUM ('open','in_progress','pending','resolved','closed');
-  EXCEPTION WHEN duplicate_object THEN NULL;
+  CREATE TYPE ticket_status AS ENUM ('open','in_progress','pending','resolved','closed');
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
 DO $$ BEGIN
   CREATE TYPE ticket_priority AS ENUM ('low','medium','high','critical');
-  EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
 DO $$ BEGIN
   CREATE TYPE ticket_category AS ENUM ('hardware','software','network','access','email','printer','other');
-  EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
 DO $$ BEGIN
   CREATE TYPE notification_type AS ENUM (
-    'ticket_created','ticket_assigned','ticket_updated',
-    'ticket_resolved','ticket_closed','comment_added'
+    'ticket_created',
+    'ticket_assigned',
+    'ticket_updated',
+    'ticket_resolved',
+    'ticket_closed',
+    'comment_added'
   );
-  EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ── Updated_at trigger function ───────────────────────────────
+-- ─────────────────────────────────────────────
+-- UPDATED_AT FUNCTION
+-- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
-
--- ── USERS ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS users (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name          VARCHAR(100) NOT NULL,
-  email         VARCHAR(255) NOT NULL UNIQUE,
-  password_hash TEXT         NOT NULL,
-  role          user_role    NOT NULL DEFAULT 'user',
-  department    VARCHAR(100),
-  phone         VARCHAR(30),
-  avatar_url    TEXT,
-  is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
-  last_login_at TIMESTAMPTZ,
-  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role     ON users(role);
-CREATE INDEX IF NOT EXISTS idx_users_active   ON users(is_active);
-
-DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
-CREATE TRIGGER trg_users_updated_at
-  BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ── TICKETS ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS tickets (
-  id            UUID              PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_number SERIAL            UNIQUE,
-  title         VARCHAR(255)      NOT NULL,
-  description   TEXT              NOT NULL,
-  status        ticket_status     NOT NULL DEFAULT 'open',
-  priority      ticket_priority   NOT NULL DEFAULT 'medium',
-  category      ticket_category   NOT NULL DEFAULT 'other',
-  created_by    UUID              NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  assigned_to   UUID              REFERENCES users(id) ON DELETE SET NULL,
-  due_date      TIMESTAMPTZ,
-  resolved_at   TIMESTAMPTZ,
-  closed_at     TIMESTAMPTZ,
-  sla_breached  BOOLEAN           NOT NULL DEFAULT FALSE,
-  search_vector TSVECTOR,
-  created_at    TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ       NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_tickets_status      ON tickets(status);
-CREATE INDEX IF NOT EXISTS idx_tickets_priority    ON tickets(priority);
-CREATE INDEX IF NOT EXISTS idx_tickets_created_by  ON tickets(created_by);
-CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to ON tickets(assigned_to);
-CREATE INDEX IF NOT EXISTS idx_tickets_created_at  ON tickets(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_tickets_search      ON tickets USING GIN(search_vector);
-
-CREATE OR REPLACE FUNCTION tickets_search_update() RETURNS TRIGGER AS $$
 BEGIN
-  NEW.search_vector := to_tsvector('english',
-    COALESCE(NEW.title,'') || ' ' || COALESCE(NEW.description,''));
+  NEW.updated_at = NOW();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_tickets_search ON tickets;
-CREATE TRIGGER trg_tickets_search
-  BEFORE INSERT OR UPDATE ON tickets
-  FOR EACH ROW EXECUTE FUNCTION tickets_search_update();
-
-DROP TRIGGER IF EXISTS trg_tickets_updated_at ON tickets;
-CREATE TRIGGER trg_tickets_updated_at
-  BEFORE UPDATE ON tickets
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ── TICKET ATTACHMENTS ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ticket_attachments (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_id   UUID        NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-  uploaded_by UUID        NOT NULL REFERENCES users(id)   ON DELETE RESTRICT,
-  filename    VARCHAR(255) NOT NULL,
-  file_url    TEXT         NOT NULL,
-  file_size   INTEGER,
-  mime_type   VARCHAR(100),
-  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+-- ─────────────────────────────────────────────
+-- USERS TABLE
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role user_role NOT NULL DEFAULT 'user',
+  department VARCHAR(100),
+  phone VARCHAR(30),
+  avatar_url TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  last_login_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_attachments_ticket ON ticket_attachments(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
--- ── COMMENTS ──────────────────────────────────────────────────
+DROP TRIGGER IF EXISTS trg_users_updated ON users;
+CREATE TRIGGER trg_users_updated
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ─────────────────────────────────────────────
+-- TICKETS TABLE
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS tickets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticket_number SERIAL UNIQUE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  status ticket_status DEFAULT 'open',
+  priority ticket_priority DEFAULT 'medium',
+  category ticket_category DEFAULT 'other',
+  created_by UUID REFERENCES users(id),
+  assigned_to UUID REFERENCES users(id),
+  due_date TIMESTAMP,
+  resolved_at TIMESTAMP,
+  closed_at TIMESTAMP,
+  sla_breached BOOLEAN DEFAULT FALSE,
+  search_vector TSVECTOR,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_status ON tickets(status);
+CREATE INDEX IF NOT EXISTS idx_ticket_priority ON tickets(priority);
+
+-- Full-text search
+CREATE OR REPLACE FUNCTION tickets_search_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector :=
+    to_tsvector('english',
+      COALESCE(NEW.title,'') || ' ' || COALESCE(NEW.description,'')
+    );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_ticket_search ON tickets;
+CREATE TRIGGER trg_ticket_search
+BEFORE INSERT OR UPDATE ON tickets
+FOR EACH ROW EXECUTE FUNCTION tickets_search_update();
+
+DROP TRIGGER IF EXISTS trg_ticket_updated ON tickets;
+CREATE TRIGGER trg_ticket_updated
+BEFORE UPDATE ON tickets
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ─────────────────────────────────────────────
+-- COMMENTS
+-- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS comments (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_id   UUID        NOT NULL REFERENCES tickets(id)  ON DELETE CASCADE,
-  author_id   UUID        NOT NULL REFERENCES users(id)    ON DELETE RESTRICT,
-  body        TEXT        NOT NULL,
-  is_internal BOOLEAN     NOT NULL DEFAULT FALSE,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES users(id),
+  body TEXT NOT NULL,
+  is_internal BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_comments_ticket ON comments(ticket_id);
-CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(author_id);
+DROP TRIGGER IF EXISTS trg_comment_updated ON comments;
+CREATE TRIGGER trg_comment_updated
+BEFORE UPDATE ON comments
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-DROP TRIGGER IF EXISTS trg_comments_updated_at ON comments;
-CREATE TRIGGER trg_comments_updated_at
-  BEFORE UPDATE ON comments
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ── TICKET HISTORY ────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ticket_history (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_id   UUID        NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-  changed_by  UUID        NOT NULL REFERENCES users(id)  ON DELETE RESTRICT,
-  field_name  VARCHAR(100) NOT NULL,
-  old_value   TEXT,
-  new_value   TEXT,
-  changed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- ─────────────────────────────────────────────
+-- ATTACHMENTS
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS attachments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
+  uploaded_by UUID REFERENCES users(id),
+  file_url TEXT NOT NULL,
+  filename VARCHAR(255),
+  file_size INT,
+  mime_type VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_history_ticket     ON ticket_history(ticket_id);
-CREATE INDEX IF NOT EXISTS idx_history_changed_at ON ticket_history(changed_at DESC);
-
--- ── NOTIFICATIONS ─────────────────────────────────────────────
+-- ─────────────────────────────────────────────
+-- NOTIFICATIONS
+-- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (
-  id          UUID              PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id     UUID              NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
-  ticket_id   UUID              REFERENCES tickets(id) ON DELETE CASCADE,
-  type        notification_type NOT NULL,
-  title       VARCHAR(255)      NOT NULL,
-  message     TEXT,
-  is_read     BOOLEAN           NOT NULL DEFAULT FALSE,
-  created_at  TIMESTAMPTZ       NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  ticket_id UUID REFERENCES tickets(id),
+  type notification_type,
+  title VARCHAR(255),
+  message TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_notif_user   ON notifications(user_id, is_read);
-CREATE INDEX IF NOT EXISTS idx_notif_ticket ON notifications(ticket_id);
-
--- ── EMAIL LOGS ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS email_logs (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_id   UUID        REFERENCES tickets(id) ON DELETE SET NULL,
-  recipient   VARCHAR(255) NOT NULL,
-  subject     VARCHAR(500) NOT NULL,
-  template    VARCHAR(100),
-  status      VARCHAR(20)  NOT NULL DEFAULT 'pending',
-  error_msg   TEXT,
-  sent_at     TIMESTAMPTZ,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ── REFRESH TOKENS ────────────────────────────────────────────
+-- ─────────────────────────────────────────────
+-- REFRESH TOKENS
+-- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash  TEXT        NOT NULL UNIQUE,
-  expires_at  TIMESTAMPTZ NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_refresh_user ON refresh_tokens(user_id);
-
--- ── VIEWS ─────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────
+-- VIEW: TICKET SUMMARY
+-- ─────────────────────────────────────────────
 CREATE OR REPLACE VIEW v_ticket_summary AS
 SELECT
-  t.id, t.ticket_number, t.title, t.status, t.priority, t.category,
-  t.created_at, t.updated_at, t.due_date, t.sla_breached,
-  uc.name  AS creator_name,  uc.email AS creator_email,
-  ua.name  AS assignee_name, ua.email AS assignee_email,
-  (SELECT COUNT(*) FROM comments c   WHERE c.ticket_id=t.id) AS comment_count,
-  (SELECT COUNT(*) FROM ticket_attachments a WHERE a.ticket_id=t.id) AS attachment_count
+  t.id,
+  t.ticket_number,
+  t.title,
+  t.status,
+  t.priority,
+  t.category,
+  t.created_at,
+  uc.name AS creator_name,
+  ua.name AS assignee_name
 FROM tickets t
-JOIN  users uc ON t.created_by=uc.id
-LEFT JOIN users ua ON t.assigned_to=ua.id;
+LEFT JOIN users uc ON t.created_by = uc.id
+LEFT JOIN users ua ON t.assigned_to = ua.id;
 
+-- ─────────────────────────────────────────────
+-- VIEW: DASHBOARD STATS
+-- ─────────────────────────────────────────────
 CREATE OR REPLACE VIEW v_dashboard_stats AS
 SELECT
-  COUNT(*) FILTER (WHERE status='open')         AS open_count,
-  COUNT(*) FILTER (WHERE status='in_progress')  AS in_progress_count,
-  COUNT(*) FILTER (WHERE status='resolved')     AS resolved_count,
-  COUNT(*) FILTER (WHERE status='closed')       AS closed_count,
-  COUNT(*) FILTER (WHERE priority='critical')   AS critical_count,
-  COUNT(*) FILTER (WHERE sla_breached=TRUE)     AS sla_breached_count,
-  COUNT(*)                                       AS total_count
+  COUNT(*) FILTER (WHERE status='open') AS open_count,
+  COUNT(*) FILTER (WHERE status='in_progress') AS in_progress_count,
+  COUNT(*) FILTER (WHERE status='resolved') AS resolved_count,
+  COUNT(*) FILTER (WHERE status='closed') AS closed_count,
+  COUNT(*) AS total_tickets
 FROM tickets;
+
+-- ─────────────────────────────────────────────
+-- DEFAULT ADMIN USER (IMPORTANT)
+-- password = 123456 (bcrypt hashed recommended)
+-- ─────────────────────────────────────────────
+INSERT INTO users (name, email, password_hash, role)
+VALUES (
+  'Admin',
+  'admin@company.com',
+  crypt('123456', gen_salt('bf')),
+  'admin'
+)
+ON CONFLICT (email) DO NOTHING;
