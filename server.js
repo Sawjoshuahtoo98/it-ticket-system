@@ -18,17 +18,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Trust proxy (needed on Render/Heroku) ─────────────────────
+// ── Trust proxy ───────────────────────────────────────────────
 app.set('trust proxy', 1);
 
 // ── Security headers ──────────────────────────────────────────
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow image serving
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// ── CORS ──────────────────────────────────────────────────────
+// ── CORS FIX (🔥 IMPORTANT) ───────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5500',
+  process.env.FRONTEND_URL,                 // from env (recommended)
+  'https://helpdesk-ui.onrender.com',       // ✅ your frontend
   'http://localhost:5500',
   'http://localhost:3000',
   'http://127.0.0.1:5500',
@@ -36,47 +37,50 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (curl, Postman, mobile)
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS: origin ${origin} not allowed`));
+    if (!origin) return cb(null, true); // allow Postman / curl
+
+    if (allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+
+    return cb(new Error(`CORS not allowed: ${origin}`));
   },
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
 }));
 
-// ── Global rate limit ─────────────────────────────────────────
+// ── Rate limit ────────────────────────────────────────────────
 app.use('/api', rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
   max:      parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   standardHeaders: true,
-  legacyHeaders:   false,
+  legacyHeaders: false,
   message: { error: 'Too many requests, please slow down.' },
 }));
 
-// ── Body parsing ──────────────────────────────────────────────
+// ── Middleware ────────────────────────────────────────────────
 app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── HTTP logging ──────────────────────────────────────────────
+// ── Logging ───────────────────────────────────────────────────
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.http(msg.trim()) },
   skip: (req) => req.path === '/api/health',
 }));
 
-// ── Static uploads ────────────────────────────────────────────
+// ── Static files ──────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// ── API routes ────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────
 app.use('/api', routes);
 
-// ── Error handlers ────────────────────────────────────────────
+// ── Errors ────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
-// ── Boot ──────────────────────────────────────────────────────
+// ── Start server ──────────────────────────────────────────────
 const start = async () => {
   await testConnection();
   app.listen(PORT, () => {
